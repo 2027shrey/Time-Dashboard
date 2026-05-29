@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ultimate Time & Task Dashboard with Laps</title>
+    <style>
+        /* --- CSS VARIABLE SYSTEM (THEMING) --- */
+        :root {
+            --bg-gradient: linear-gradient(135deg, #eef2f3 0%, #8e9eab 100%);
+            --card-bg: rgba(255, 255, 255, 0.85);
+            --text-color: #333333;
+            --heading-color: #2c3e50;
+            --primary-color: #4a90e2;
+            --accent-color: #e24a4a;
+            --fullscreen-btn-color: #2ecc71;
+            --shadow: 0 8px 32px rgba(31, 38, 135, 0.08);
+            --border-color: rgba(255, 255, 255, 0.4);
+            --particle-color: rgba(74, 144, 226, 0.4);
+            --line-color: rgba(142, 158, 171, 0.35);
+            --todo-item-bg: rgba(249, 251, 251, 0.6);
+            --table-header-bg: rgba(230, 235, 240, 0.6);
+        }
+
+        [data-theme="dark"] {
+            --bg-gradient: linear-gradient(135deg, #141e30 0%, #243b55 100%);
+            --card-bg: rgba(25, 34, 46, 0.85);
+            --text-color: #f6f8fa;
+            --heading-color: #ffffff;
+            --primary-color: #3498db;
+            --accent-color: #e74c3c;
+            --fullscreen-btn-color: #2ecc71;
+            --shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            --border-color: rgba(255, 255, 255, 0.05);
+            --particle-color: rgba(52, 152, 219, 0.6);
+            --line-color: rgba(52, 152, 219, 0.2);
+            --todo-item-bg: rgba(36, 49, 66, 0.6);
+            --table-header-bg: rgba(45, 55, 72, 0.6);
+        }
+
+        #bg-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: -1;
+            background: var(--bg-gradient);
+            transition: background 0.5s ease;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            box-sizing: border-box;
+            transition: color 0.3s ease;
+        }
+
+        .header-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1200px;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            margin: 0;
+            color: var(--heading-color);
+            text-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .theme-toggle-btn {
+            background-color: var(--heading-color);
+            color: var(--card-bg);
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            box-shadow: var(--shadow);
+        }
+
+        .dashboard {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+            max-width: 1200px;
+            width: 100%;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            box-shadow: var(--shadow);
+            padding: 30px;
+            width: 320px;
+            text-align: center;
+            flex: 1;
+            min-width: 300px;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            box-sizing: border-box;
+            transition: transform 0.2s, background 0.3s, border 0.3s;
+        }
+
+        .card:hover { transform: translateY(-2px); }
+
+        .display {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin: 20px 0;
+            font-variant-numeric: tabular-nums;
+            color: var(--heading-color);
+        }
+
+        .controls {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 15px;
+        }
+
+        button {
+            padding: 10px 15px;
+            font-size: 0.95rem;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.1s;
+            font-weight: 600;
+        }
+
+        button:active { transform: scale(0.98); }
+
+        .btn-start { background-color: var(--primary-color); color: white; }
+        .btn-stop { background-color: var(--accent-color); color: white; }
+        .btn-reset { background-color: #95a5a6; color: white; }
+        .btn-lap { background-color: #e67e22; color: white; }
+        .btn-fullscreen { background-color: var(--fullscreen-btn-color); color: white; }
+
+        .inputs { margin-bottom: 15px; }
+        .inputs input {
+            width: 60px;
+            padding: 8px;
+            font-size: 1rem;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            text-align: center;
+            background: var(--card-bg);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+        }
+
+        /* --- LAP CONTAINER STYLES --- */
+        .laps-container {
+            max-height: 150px;
+            overflow-y: auto;
+            margin-top: 10px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+        }
+
+        .laps-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+            text-align: left;
+        }
+
+        .laps-table th {
+            background-color: var(--table-header-bg);
+            padding: 8px;
+            position: sticky;
+            top: 0;
+            color: var(--heading-color);
+        }
+
+        .laps-table td {
+            padding: 6px 8px;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-color);
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* --- TO DO LIST STYLES --- */
+        .todo-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            box-shadow: var(--shadow);
+            padding: 30px;
+            max-width: 600px;
+            width: 100%;
+            box-sizing: border-box;
+            margin: 0 auto 40px auto;
+        }
+
+        .todo-card h2 { margin-top: 0; color: var(--heading-color); text-align: center; }
+        .todo-input-row { display: flex; gap: 10px; margin-bottom: 20px; }
+        
+        .todo-input-row input {
+            flex: 1;
+            padding: 12px;
+            font-size: 1rem;
+            outline: none;
+            background: var(--card-bg);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+        }
+
+        .todo-list { list-style: none; padding: 0; margin: 0; }
+        .todo-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px;
+            background: var(--todo-item-bg);
+            border-bottom: 1px solid var(--border-color);
+            border-radius: 6px;
+            margin-bottom: 5px;
+        }
+
+        .todo-item-left { display: flex; align-items: center; gap: 12px; flex: 1; }
+        .todo-item input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; }
+        .todo-text { font-size: 1.05rem; word-break: break-all; }
+        .completed .todo-text { text-decoration: line-through; color: #a0aec0; }
+
+        .btn-delete { background: transparent; color: var(--accent-color); font-size: 1.2rem; padding: 2px 8px; }
+        .btn-delete:hover { background: rgba(226, 74, 74, 0.1); }
+        .todo-footer { margin-top: 15px; display: flex; justify-content: flex-end; }
+
+        /* --- FULLSCREEN RULES --- */
+        .card:fullscreen {
+            width: 100vw !important;
+            height: 100vh !important;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background-color: #111111 !important;
+            color: #ffffff !important;
+            padding: 50px;
+            transform: none !important;
+        }
+        .card:fullscreen h2 { font-size: 3rem; margin-bottom: 20px; color: #ffffff !important; }
+        .card:fullscreen .display { font-size: 12vw; color: #2ecc71 !important; margin: 40px 0; }
+        .card:fullscreen button { font-size: 1.5rem; padding: 15px 30px; border-radius: 10px; }
+        .card:fullscreen .inputs input { font-size: 1.5rem; width: 100px; padding: 10px; }
+        .card:fullscreen .laps-container { width: 60%; max-height: 250px; background: rgba(255,255,255,0.05); }
+    </style>
+</head>
+<body>
+
+    <canvas id="bg-canvas"></canvas>
+
+    <div class="header-container">
+        <h1 id="main-title">Workspace Dashboard</h1>
+        <button class="theme-toggle-btn" onclick="toggleTheme()" id="theme-btn">🌙 Dark Mode</button>
+    </div>
+
+    <div class="dashboard">
+        <div class="card" id="clock-card">
+            <h2>Current Time</h2>
+            <div id="clock-display" class="display">00:00:00 AM</div>
+            <div class="controls">
+                <button class="btn-fullscreen" onclick="toggleFullscreen('clock-card')">Full Screen</button>
+            </div>
+        </div>
+
+        <div class="card" id="stopwatch-card">
+            <h2>Stopwatch</h2>
+            <div id="stopwatch-display" class="display">00:00:00</div>
+            <div class="controls">
+                <button id="sw-start-btn" class="btn-start" onclick="toggleStopwatch()">Start</button>
+                <button id="sw-lap-btn" class="btn-lap" style="display: none;" onclick="recordLap()">Lap</button>
+                <button class="btn-reset" onclick="resetStopwatch()">Reset</button>
+                <button class="btn-fullscreen" onclick="toggleFullscreen('stopwatch-card')">Full Screen</button>
+            </div>
+            <div class="laps-container" id="laps-box" style="display: none;">
+                <table class="laps-table">
+                    <thead>
+                        <tr>
+                            <th>Lap</th>
+                            <th>Lap Time</th>
+                            <th>Total Time</th>
+                        </tr>
+                    </thead>
+                    <tbody id="laps-list"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card" id="timer-card">
+            <h2>Timer</h2>
+            <div class="inputs">
+                <input type="number" id="timer-min" min="0" max="99" value="5"> Min
+                <input type="number" id="timer-sec" min="0" max="59" value="0"> Sec
+            </div>
+            <div id="timer-display" class="display">05:00</div>
+            <div class="controls">
+                <button id="tm-start-btn" class="btn-start" onclick="toggleTimer()">Start</button>
+                <button class="btn-reset" onclick="resetTimer()">Reset</button>
+                <button class="btn-fullscreen" onclick="toggleFullscreen('timer-card')">Full Screen</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="todo-card">
+        <h2>Focus Tasks</h2>
+        <div class="todo-input-row">
+            <input type="text" id="todo-input" placeholder="What needs to be done?" onkeypress="handleTodoKeyPress(event)">
+            <button class="btn-start" onclick="addTodo()">Add Task</button>
+        </div>
+        <ul id="todo-list" class="todo-list"></ul>
+        <div class="todo-footer">
+            <button class="btn-reset" style="font-size: 0.85rem;" onclick="clearCompleted()">Clear Completed</button>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // SWITCH LIGHT / DARK THEMING ENGINE
+        // ==========================================
+        function toggleTheme() {
+            const currentTheme = document.documentElement.getAttribute('data-theme');
+            const themeBtn = document.getElementById('theme-btn');
+            if (currentTheme === 'dark') {
+                document.documentElement.removeAttribute('data-theme');
+                themeBtn.textContent = '🌙 Dark Mode';
+            } else {
+                document.documentElement.setAttribute('data-theme', 'dark');
+                themeBtn.textContent = '☀️ Light Mode';
+            }
+        }
+
+        // ==========================================
+        // CANVAS INTERACTIVE PHYSICS ENGINE
+        // ==========================================
+        const canvas = document.getElementById('bg-canvas');
+        const ctx = canvas.getContext('2d');
+        let particlesArray = [];
+        const numberOfParticles = 75;
+        const mouse = { x: null, y: null, radius: 150 };
+
+        window.addEventListener('mousemove', (e) => { mouse.x = e.x; mouse.y = e.y; });
+        window.addEventListener('mouseout', () => { mouse.x = null; mouse.y = null; });
+        window.addEventListener('click', (e) => {
+            if(e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') return;
+            for(let i=0; i<6; i++) { particlesArray.push(new Particle(e.x, e.y, (Math.random() * 2) + 1)); }
+            if (particlesArray.length > 120) particlesArray.splice(0, 6);
+        });
+
+        function initCanvasSize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+        initCanvasSize(); window.addEventListener('resize', initCanvasSize);
+
+        class Particle {
+            constructor(x, y, size) {
+                this.x = x || Math.random() * canvas.width;
+                this.y = y || Math.random() * canvas.height;
+                this.size = size || (Math.random() * 3) + 1;
+                this.speedX = (Math.random() * 1) - 0.5;
+                this.speedY = (Math.random() * 1) - 0.5;
+            }
+            update() {
+                this.x += this.speedX; this.y += this.speedY;
+                if (this.x > canvas.width || this.x < 0) this.speedX = -this.speedX;
+                if (this.y > canvas.height || this.y < 0) this.speedY = -this.speedY;
+                if (mouse.x != null && mouse.y != null) {
+                    let dx = mouse.x - this.x, dy = mouse.y - this.y;
+                    let distance = Math.sqrt(dx * dx + dy * dy);
+                    if (distance < mouse.radius) { this.x -= dx * 0.015; this.y -= dy * 0.015; }
+                }
+            }
+            draw() {
+                ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--particle-color');
+                ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); ctx.fill();
+            }
+        }
+
+        function setupParticles() {
+            particlesArray = [];
+            for (let i = 0; i < numberOfParticles; i++) { particlesArray.push(new Particle()); }
+        }
+        setupParticles();
+
+        function connectLines() {
+            let opacity = 1;
+            const lineColorBase = getComputedStyle(document.documentElement).getPropertyValue('--line-color').trim();
+            const baseColorMatch = lineColorBase.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+            for (let a = 0; a < particlesArray.length; a++) {
+                for (let b = a; b < particlesArray.length; b++) {
+                    let dx = particlesArray[a].x - particlesArray[b].x;
+                    let dy = particlesArray[a].y - particlesArray[b].y;
+                    let distance = Math.sqrt(dx * dx + dy * dy);
+                    if (distance < 110 && baseColorMatch) {
+                        opacity = (1 - (distance / 110)) * 0.3;
+                        ctx.strokeStyle = `rgba(${baseColorMatch[1]}, ${baseColorMatch[2]}, ${baseColorMatch[3]}, ${opacity})`;
+                        ctx.lineWidth = 1; ctx.beginPath();
+                        ctx.moveTo(particlesArray[a].x, particlesArray[a].y);
+                        ctx.lineTo(particlesArray[b].x, particlesArray[b].y); ctx.stroke();
+                    }
+                }
+            }
+        }
+
+        function animateBackground() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (let i = 0; i < particlesArray.length; i++) { particlesArray[i].update(); particlesArray[i].draw(); }
+            connectLines(); requestAnimationFrame(animateBackground);
+        }
+        animateBackground();
+
+        // ==========================================
+        // 1. CURRENT CLOCK LOGIC
+        // ==========================================
+        function updateClock() {
+            const now = new Date(); document.getElementById('clock-display').textContent = now.toLocaleTimeString();
+        }
+        updateClock(); setInterval(updateClock, 1000);
+
+        // ==========================================
+        // 2. STOPWATCH LOGIC (WITH LAP FUNCTION)
+        // ==========================================
+        let stopwatchInterval = null;
+        let elapsedMilliseconds = 0;
+        let isStopwatchRunning = false;
+        
+        let lapCounter = 0;
+        let lastLapTotalMilliseconds = 0; // Tracks when the last lap split occurred
+
+        function toggleStopwatch() {
+            const startBtn = document.getElementById('sw-start-btn');
+            const lapBtn = document.getElementById('sw-lap-btn');
+            
+            if (!isStopwatchRunning) {
+                isStopwatchRunning = true;
+                startBtn.textContent = 'Pause'; startBtn.className = 'btn-stop';
+                lapBtn.style.display = 'inline-block'; // Reveal the Lap mechanism button
+                
+                const startTime = Date.now() - elapsedMilliseconds;
+                stopwatchInterval = setInterval(() => {
+                    elapsedMilliseconds = Date.now() - startTime;
+                    displayStopwatch();
+                }, 10);
+            } else {
+                isStopwatchRunning = false;
+                startBtn.textContent = 'Start'; startBtn.className = 'btn-start';
+                clearInterval(stopwatchInterval);
+            }
+        }
+
+        function resetStopwatch() {
+            clearInterval(stopwatchInterval);
+            isStopwatchRunning = false;
+            elapsedMilliseconds = 0;
+            lapCounter = 0;
+            lastLapTotalMilliseconds = 0;
+
+            document.getElementById('stopwatch-display').textContent = "00:00:00";
+            
+            const startBtn = document.getElementById('sw-start-btn');
+            startBtn.textContent = 'Start'; startBtn.className = 'btn-start';
+            
+            // Wipe out lap interface layout states
+            document.getElementById('sw-lap-btn').style.display = 'none';
+            document.getElementById('laps-box').style.display = 'none';
+            document.getElementById('laps-list').innerHTML = '';
+        }
+
+        function formatTimeStrings(totalMs) {
+            let totalSeconds = Math.floor(totalMs / 1000);
+            let ms = Math.floor((totalMs % 1000) / 10);
+            let mins = Math.floor(totalSeconds / 60);
+            let secs = totalSeconds % 60;
+            return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}:${String(ms).padStart(2, '0')}`;
+        }
+
+        function displayStopwatch() {
+            document.getElementById('stopwatch-display').textContent = formatTimeStrings(elapsedMilliseconds);
+        }
+
+        function recordLap() {
+            if (!isStopwatchRunning) return; // Cap action if device metric paused
+
+            lapCounter++;
+            const lapsBox = document.getElementById('laps-box');
+            const lapsList = document.getElementById('laps-list');
+
+            // Show table box if this is the first lap recorded
+            if(lapsBox.style.display === 'none') lapsBox.style.display = 'block';
+
+            // Calculate exact split duration differences
+            const currentLapDuration = elapsedMilliseconds - lastLapTotalMilliseconds;
+
+            // Generate clean row element markup strings
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>#${lapCounter}</td>
+                <td>${formatTimeStrings(currentLapDuration)}</td>
+                <td>${formatTimeStrings(elapsedMilliseconds)}</td>
+            `;
+
+            // Insert new rows at the top of the table list container
+            lapsList.insertBefore(row, lapsList.firstChild);
+
+            // Update baseline marker offsets for the next lap calculation
+            lastLapTotalMilliseconds = elapsedMilliseconds;
+        }
+
+        // ==========================================
+        // 3. TIMER LOGIC
+        // ==========================================
+        let timerInterval = null, remainingSeconds = 0, isTimerRunning = false;
+        function toggleTimer() {
+            const startBtn = document.getElementById('tm-start-btn');
+            if (!isTimerRunning) {
+                if (remainingSeconds <= 0) {
+                    const minsInput = parseInt(document.getElementById('timer-min').value) || 0;
+                    const secsInput = parseInt(document.getElementById('timer-sec').value) || 0;
+                    remainingSeconds = (minsInput * 60) + secsInput;
+                }
+                if (remainingSeconds <= 0) return;
+                isTimerRunning = true; startBtn.textContent = 'Pause'; startBtn.className = 'btn-stop';
+                timerInterval = setInterval(() => {
+                    remainingSeconds--; displayTimer();
+                    if (remainingSeconds <= 0) { clearInterval(timerInterval); alert("Time's up!"); resetTimer(); }
+                }, 1000);
+            } else {
+                isTimerRunning = false; startBtn.textContent = 'Start'; startBtn.className = 'btn-start'; clearInterval(timerInterval);
+            }
+        }
+        function resetTimer() {
+            clearInterval(timerInterval); isTimerRunning = false; remainingSeconds = 0;
+            const minsInput = parseInt(document.getElementById('timer-min').value) || 0;
+            const secsInput = parseInt(document.getElementById('timer-sec').value) || 0;
+            document.getElementById('timer-display').textContent = `${String(minsInput).padStart(2, '0')}:${String(secsInput).padStart(2, '0')}`;
+            const startBtn = document.getElementById('tm-start-btn'); startBtn.textContent = 'Start'; startBtn.className = 'btn-start';
+        }
+        function displayTimer() {
+            let mins = Math.floor(remainingSeconds / 60), secs = remainingSeconds % 60;
+            document.getElementById('timer-display').textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+        }
+
+        // ==========================================
+        // 4. TO DO LIST LOGIC
+        // ==========================================
+        function handleTodoKeyPress(event) { if (event.key === 'Enter') { addTodo(); } }
+        function addTodo() {
+            const input = document.getElementById('todo-input'), taskText = input.value.trim();
+            if (taskText === "") return;
+            const ul = document.getElementById('todo-list'), li = document.createElement('li');
+            li.className = 'todo-item';
+            li.innerHTML = `
+                <div class="todo-item-left">
+                    <input type="checkbox" onchange="toggleTaskComplete(this)">
+                    <span class="todo-text">${taskText}</span>
+                </div>
+                <button class="btn-delete" onclick="deleteTask(this)">×</button>
+            `;
+            ul.appendChild(li); input.value = "";
+        }
+        function toggleTaskComplete(checkbox) {
+            const todoItem = checkbox.closest('.todo-item');
+            if (checkbox.checked) { todoItem.classList.add('completed'); } else { todoItem.classList.remove('completed'); }
+        }
+        function deleteTask(button) { button.closest('.todo-item').remove(); }
+        function clearCompleted() { document.querySelectorAll('.todo-item.completed').forEach(item => item.remove()); }
+
+        // ==========================================
+        // GLOBAL FULLSCREEN FUNCTION
+        // ==========================================
+        function toggleFullscreen(cardId) {
+            const card = document.getElementById(cardId);
+            if (!document.fullscreenElement) {
+                if (card.requestFullscreen) { card.requestFullscreen(); }
+                else if (card.webkitRequestFullscreen) { card.webkitRequestFullscreen(); }
+            } else {
+                if (document.exitFullscreen) { document.exitFullscreen(); }
+            }
+        }
+        document.addEventListener('fullscreenchange', () => {
+            const fullScreenButtons = document.querySelectorAll('.btn-fullscreen');
+            fullScreenButtons.forEach(btn => {
+                if (document.fullscreenElement) {
+                    btn.textContent = 'Exit Full Screen'; btn.className = 'btn-fullscreen btn-stop';
+                } else {
+                    btn.textContent = 'Full Screen'; btn.className = 'btn-fullscreen';
+                }
+            });
+        });
+    </script>
+</body>
+</html>
